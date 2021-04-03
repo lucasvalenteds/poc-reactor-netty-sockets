@@ -4,10 +4,6 @@ It demonstrates non-blocking reactive web server based on WebSockets running on 
 
 ## How to run
 
-![java]
-
 | Description | Command |
 | :--- | :--- |
 | Run tests | `./gradlew test` |
-
-[java]: https://img.shields.io/badge/jdk-11-5481A0.svg?style=for-the-badge "OpenJDK 11"
