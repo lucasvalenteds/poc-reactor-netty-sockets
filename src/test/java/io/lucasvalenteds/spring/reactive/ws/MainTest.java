@@ -1,16 +1,14 @@
 package io.lucasvalenteds.spring.reactive.ws;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
-import java.time.Duration;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import reactor.core.Disposable;
+import reactor.core.publisher.DirectProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
@@ -18,51 +16,56 @@ import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.server.HttpServer;
 import reactor.test.StepVerifier;
 
+import java.time.Duration;
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 class MainTest {
 
-    private static final ClientToServerHandler clientToServerHandler = new ClientToServerHandler();
-    private final HttpServer server = HttpServer.create()
-        .host("localhost")
-        .port(8080)
-        .route(router ->
-            router
-                .ws("/client-to-server", clientToServerHandler)
-                .ws("/server-to-client", new ServerToClientHandler())
-                .ws("/duplex", new DuplexHandler())
-                .ws("/duplex-infinite", new DuplexInfiniteHandler())
-                .ws("/header", new HeaderHandler())
-        );
+    private final DirectProcessor<String> processor = DirectProcessor.create();
+
     private DisposableServer disposable;
 
     @BeforeEach
     void startServer() {
-        disposable = server.bindNow();
+        disposable = HttpServer.create()
+            .host("localhost")
+            .port(8080)
+            .route(router ->
+                router
+                    .ws("/client-to-server", new ClientToServerHandler(processor))
+                    .ws("/server-to-client", new ServerToClientHandler())
+                    .ws("/duplex", new DuplexHandler())
+                    .ws("/duplex-infinite", new DuplexInfiniteHandler())
+                    .ws("/header", new HeaderHandler())
+            )
+            .bindNow();
     }
 
     @AfterEach
     void stopServer() {
         disposable.disposeNow();
+        processor.dispose();
     }
 
     @Test
-    void testItCanSendData() throws InterruptedException {
-        assertNull(clientToServerHandler.getWordReceived());
-
-        HttpClient.WebsocketSender client = HttpClient.create()
+    void testItCanSendData() {
+        Disposable clientDisposable = HttpClient.create()
             .baseUrl("ws://localhost:8080")
             .websocket()
-            .uri("/client-to-server");
+            .uri("/client-to-server")
+            .handle((in, out) ->
+                out.sendByteArray(Mono.just("Awesome".getBytes()))
+            )
+            .subscribe();
 
-        Flux<Void> response = client.handle((in, out) ->
-            out.sendByteArray(Mono.just("Awesome".getBytes()))
-        );
-
-        StepVerifier.create(response)
+        StepVerifier.create(processor.take(1))
+            .assertNext(word -> assertEquals("Awesome", word))
             .expectComplete()
             .verify();
 
-        Thread.sleep(500);
-        assertEquals("Awesome", clientToServerHandler.getWordReceived());
+        clientDisposable.dispose();
     }
 
     @Test
