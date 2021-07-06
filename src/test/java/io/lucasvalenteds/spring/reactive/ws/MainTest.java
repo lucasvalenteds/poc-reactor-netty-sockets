@@ -8,9 +8,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import reactor.core.Disposable;
-import reactor.core.publisher.DirectProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.server.HttpServer;
@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class MainTest {
 
-    private final DirectProcessor<String> processor = DirectProcessor.create();
+    private final Sinks.Many<String> sink = Sinks.many()
+        .unicast()
+        .onBackpressureBuffer();
 
     private DisposableServer disposable;
 
@@ -34,7 +36,7 @@ class MainTest {
             .port(8080)
             .route(router ->
                 router
-                    .ws("/client-to-server", new ClientToServerHandler(processor))
+                    .ws("/client-to-server", new ClientToServerHandler(sink))
                     .ws("/server-to-client", new ServerToClientHandler())
                     .ws("/duplex", new DuplexHandler())
                     .ws("/duplex-infinite", new DuplexInfiniteHandler())
@@ -46,7 +48,6 @@ class MainTest {
     @AfterEach
     void stopServer() {
         disposable.disposeNow();
-        processor.dispose();
     }
 
     @Test
@@ -60,7 +61,7 @@ class MainTest {
             )
             .subscribe();
 
-        StepVerifier.create(processor.take(1))
+        StepVerifier.create(sink.asFlux().take(1))
             .assertNext(word -> assertEquals("Awesome", word))
             .expectComplete()
             .verify();
