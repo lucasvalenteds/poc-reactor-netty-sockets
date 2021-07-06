@@ -1,8 +1,8 @@
 package io.lucasvalenteds.spring.reactive.ws;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -23,20 +23,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class MainTest {
 
-    private final Sinks.Many<String> sink = Sinks.many()
+    private static final Sinks.Many<String> SINK = Sinks.many()
         .unicast()
         .onBackpressureBuffer();
 
-    private DisposableServer disposable;
+    private static DisposableServer disposable;
 
-    @BeforeEach
-    void startServer() {
+    @BeforeAll
+    static void beforeAll() {
         disposable = HttpServer.create()
             .host("localhost")
             .port(8080)
             .route(router ->
                 router
-                    .ws("/client-to-server", new ClientToServerHandler(sink))
+                    .ws("/client-to-server", new ClientToServerHandler(SINK))
                     .ws("/server-to-client", new ServerToClientHandler())
                     .ws("/duplex", new DuplexHandler())
                     .ws("/duplex-infinite", new DuplexInfiniteHandler())
@@ -45,8 +45,8 @@ class MainTest {
             .bindNow();
     }
 
-    @AfterEach
-    void stopServer() {
+    @AfterAll
+    static void afterAll() {
         disposable.disposeNow();
     }
 
@@ -61,7 +61,7 @@ class MainTest {
             )
             .subscribe();
 
-        StepVerifier.create(sink.asFlux().take(1))
+        StepVerifier.create(SINK.asFlux().take(1))
             .assertNext(word -> assertEquals("Awesome", word))
             .expectComplete()
             .verify();
