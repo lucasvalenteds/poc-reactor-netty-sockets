@@ -1,11 +1,12 @@
 package io.lucasvalenteds.spring.reactive.ws;
 
-import java.util.function.BiFunction;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.netty.ByteBufFlux;
 import reactor.netty.http.websocket.WebsocketInbound;
 import reactor.netty.http.websocket.WebsocketOutbound;
+
+import java.util.function.BiFunction;
 
 public class DuplexHandler implements BiFunction<WebsocketInbound, WebsocketOutbound, Publisher<Void>> {
 
