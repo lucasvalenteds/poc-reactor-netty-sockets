@@ -3,11 +3,11 @@ package io.lucasvalenteds.spring.reactive.ws;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -23,6 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class MainTest {
 
+    private static final String SERVER_HOST = "localhost";
+    private static final int SERVER_PORT = 8080;
+    private static final String SERVER_URL = "ws://localhost:8080";
+
     private static final Sinks.Many<String> SINK = Sinks.many()
         .unicast()
         .onBackpressureBuffer();
@@ -32,8 +36,8 @@ class MainTest {
     @BeforeAll
     static void beforeAll() {
         disposable = HttpServer.create()
-            .host("localhost")
-            .port(8080)
+            .host(SERVER_HOST)
+            .port(SERVER_PORT)
             .route(router ->
                 router
                     .ws("/client-to-server", new ClientToServerHandler(SINK))
@@ -50,10 +54,11 @@ class MainTest {
         disposable.disposeNow();
     }
 
+    @DisplayName("Client sending data to server (client-to-server)")
     @Test
-    void testItCanSendData() {
-        Disposable clientDisposable = HttpClient.create()
-            .baseUrl("ws://localhost:8080")
+    void testClientToServer() {
+        var clientDisposable = HttpClient.create()
+            .baseUrl(SERVER_URL)
             .websocket()
             .uri("/client-to-server")
             .handle((in, out) ->
@@ -69,14 +74,15 @@ class MainTest {
         clientDisposable.dispose();
     }
 
+    @DisplayName("Client receiving data from server (server-to-client)")
     @Test
-    void testItCanReceiveData() {
-        HttpClient.WebsocketSender client = HttpClient.create()
-            .baseUrl("ws://localhost:8080")
+    void testServerToClient() {
+        var client = HttpClient.create()
+            .baseUrl(SERVER_URL)
             .websocket()
             .uri("/server-to-client");
 
-        Flux<String> response = client.handle((in, out) -> Flux.from(in.receive().asString()));
+        var response = client.handle((in, out) -> Flux.from(in.receive().asString()));
 
         StepVerifier.create(response)
             .expectNext("Hello")
@@ -86,14 +92,15 @@ class MainTest {
             .verify();
     }
 
+    @DisplayName("Client sending and receiving data from server (duplex)")
     @Test
-    void testItCanSendAndReceiveData() {
-        HttpClient.WebsocketSender client = HttpClient.create()
-            .baseUrl("ws://localhost:8080")
+    void testDuplex() {
+        var client = HttpClient.create()
+            .baseUrl(SERVER_URL)
             .websocket()
             .uri("/duplex");
 
-        Flux<String> response = client.handle((in, out) -> {
+        var response = client.handle((in, out) -> {
             out.sendString(Flux.just("1", "2", "3"))
                 .then().subscribe();
 
@@ -110,15 +117,18 @@ class MainTest {
             .verify();
     }
 
+    @DisplayName("Client sending and receiving data from server infinitely (duplex)")
     @Test
-    void testServerCanStreamDataForever() {
-        HttpClient.WebsocketSender client = HttpClient.create()
-            .baseUrl("ws://localhost:8080")
+    void testDuplexInfinite() {
+        var client = HttpClient.create()
+            .baseUrl(SERVER_URL)
             .websocket()
             .uri("/duplex-infinite");
 
-        Flux<String> response = client.handle((in, out) -> {
-            out.sendString(Flux.just("hello", "world", ":)")).then().subscribe();
+        var response = client.handle((in, out) -> {
+            out.sendString(Flux.just("hello", "world", ":)"))
+                .then()
+                .subscribe();
 
             return in.receive().asString();
         });
@@ -139,16 +149,17 @@ class MainTest {
         );
     }
 
-    @ParameterizedTest
+    @DisplayName("Server responding according to client headers")
+    @ParameterizedTest(name = "Header Content-Type: {0}")
     @MethodSource("headerFixtures")
-    void testItCanInspectHeaders(String contentType, String message) {
-        HttpClient.WebsocketSender client = HttpClient.create()
-            .baseUrl("ws://localhost:8080")
+    void testHeaders(String contentType, String message) {
+        var client = HttpClient.create()
+            .baseUrl(SERVER_URL)
             .headers(headers -> headers.set(HttpHeaderNames.CONTENT_TYPE, contentType))
             .websocket()
             .uri("/header");
 
-        Flux<String> response = client.handle((in, out) ->
+        var response = client.handle((in, out) ->
             in.receive()
                 .asString()
                 .take(1)
