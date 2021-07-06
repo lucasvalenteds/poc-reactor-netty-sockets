@@ -25,7 +25,7 @@ class MainTest {
 
     private static final String SERVER_HOST = "localhost";
     private static final int SERVER_PORT = 8080;
-    private static final String SERVER_URL = "ws://localhost:8080";
+    private static final String SERVER_URL = "ws://" + SERVER_HOST + ":" + SERVER_PORT;
 
     private static final Sinks.Many<String> SINK = Sinks.many()
         .unicast()
