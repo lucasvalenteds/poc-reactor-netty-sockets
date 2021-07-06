@@ -1,4 +1,4 @@
-package io.lucasvalenteds.spring.reactive.ws;
+package com.example;
 
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Sinks;

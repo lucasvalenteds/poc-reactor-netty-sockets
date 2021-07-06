@@ -1,4 +1,4 @@
-package io.lucasvalenteds.spring.reactive.ws;
+package com.example;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.junit.jupiter.api.AfterAll;
